@@ -1,0 +1,2 @@
+# SountToTextPythonFlaskWebSite
+使用python/flask搭建一个网站，提供一个STT功能

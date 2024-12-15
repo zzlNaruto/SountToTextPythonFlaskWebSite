@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StandAI sound to text</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #f8f9fa;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+        .container {
+            text-align: center;
+            max-width: 600px;
+            padding: 20px;
+            background: #ffffff;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            border-radius: 10px;
+        }
+        .logo {
+            font-size: 4rem;
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #4285F4;
+        }
+        .logoLittle {
+            font-size: 1.5rem;
+            margin-bottom: 20px;
+        }
+        .logo span {
+            display: inline-block;
+            margin: 0;
+            letter-spacing: -0.3em; /* Reduce spacing between letters */
+        }
+        .logo span.space {
+            display: inline;
+            margin: 0 0.2em; /* Keep space between words */
+        }
+        .logo .logoRed { color: #EA4335; } /* Red */
+        .logo .logoYellowd { color: #FBBC05; } /* Yellow */
+        .logo .logoBlue { color: #4285F4; } /* Blue */
+        .logo .logoGreen { color: #34A853; } /* Green */
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo">
+            <span class="logoRed">S</span>
+            <span class="logoYellowd">t</span>
+            <span class="logoBlue">a</span>
+            <span class="logoGreen">n</span>
+            <span class="logoRed">d</span>
+            <span class="logoYellowd">A</span>
+            <span class="logoBlue">I</span>
+        </div>
+        <form action="/uploadFile" method="POST" enctype="multipart/form-data">
+            <div class="mb-3">
+                <input class="form-control" type="file" name="audio_file" accept="audio/*" required>
+            </div>
+            <button type="submit" class="btn btn-primary">sound to text</button>
+        </form>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

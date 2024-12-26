@@ -2,6 +2,9 @@
 import os
 import json
 import time
+import oss2
+from oss2.credentials import EnvironmentVariableCredentialsProvider
+import requests
 from aliyunsdkcore.acs_exception.exceptions import ClientException
 from aliyunsdkcore.acs_exception.exceptions import ServerException
 from aliyunsdkcore.client import AcsClient
@@ -96,10 +99,30 @@ def fileTrans(akId, akSecret, appKey, fileLink) :
     else :
         print ("录音文件识别失败！")
     return
-accessKeyId = ""
-accessKeySecret = ""
-appKey = "C5jlguzrxe6ZadAX"
-fileLink = "https://stt-bucket.oss-cn-beijing.aliyuncs.com/helloworld/nls-sample-16k.wav?Expires=1733845668&OSSAccessKeyId=TMP.3KfozSkfUsJXDLc784yEQ3sqTuo14kv2YmjAD6veRVmNuajA7deYLW9rvjsMdj461JnW4Rz3U1Ygvmm6iXCGy295AxMqqA&Signature=I67YF2f1NLo13RP3Or91M3b2Sm4%3D"
-# fileLink = "https://stt-bucket.oss-cn-beijing-internal.aliyuncs.com/helloworld/nls-sample-16k.wav"
+
+# 从环境变量中获取访问凭证。运行本代码示例之前，请确保已设置环境变量OSS_ACCESS_KEY_ID和OSS_ACCESS_KEY_SECRET。
+auth = oss2.ProviderAuth(EnvironmentVariableCredentialsProvider())
+# 填写Bucket所在地域对应的Endpoint。以华东1（杭州）为例，Endpoint填写为https://oss-cn-hangzhou.aliyuncs.com。
+endpoint = "https://oss-cn-beijing.aliyuncs.com"
+
+# 填写Endpoint对应的Region信息，例如cn-hangzhou。注意，v4签名下，必须填写该参数
+region = "cn-beijing"
+
+# yourBucketName填写存储空间名称。
+bucket = oss2.Bucket(auth, endpoint, "stt-bucket", region=region)
+# 填写Object完整路径，例如exampledir/exampleobject.txt。Object完整路径中不能包含Bucket名称。
+object_name = 'helloworld/nls-sample-16k.wav'
+
+# 生成下载文件的签名URL，有效时间为3600秒。
+# 设置slash_safe为True，OSS不会对Object完整路径中的正斜线（/）进行转义，此时生成的签名URL可以直接使用。
+fileUrl = bucket.sign_url('GET', object_name, 3600, slash_safe=True)
+
+# fileUrl = "https://stt-bucket.oss-cn-beijing.aliyuncs.com/helloworld/nls-sample-16k.wav?Expires=1733845668&OSSAccessKeyId=TMP.3KfozSkfUsJXDLc784yEQ3sqTuo14kv2YmjAD6veRVmNuajA7deYLW9rvjsMdj461JnW4Rz3U1Ygvmm6iXCGy295AxMqqA&Signature=I67YF2f1NLo13RP3Or91M3b2Sm4%3D"
+# fileUrl = "https://stt-bucket.oss-cn-beijing-internal.aliyuncs.com/helloworld/nls-sample-16k.wav"
+
+accessKeyId = os.getenv("OSS_ACCESS_KEY_ID")
+accessKeySecret = os.getenv("OSS_ACCESS_KEY_SECRET")
+appKey = os.getenv("STT_APP_KEY")
+
 # 执行录音文件识别
-fileTrans(accessKeyId, accessKeySecret, appKey, fileLink)
+fileTrans(accessKeyId, accessKeySecret, appKey, fileUrl)

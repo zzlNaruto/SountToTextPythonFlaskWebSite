@@ -9,8 +9,8 @@ from aliyunsdkcore.acs_exception.exceptions import ClientException
 from aliyunsdkcore.acs_exception.exceptions import ServerException
 from aliyunsdkcore.client import AcsClient
 from aliyunsdkcore.request import CommonRequest
-from flask import jsonify
-def fileTrans(object_name) :
+from deleteLogic import delete_file
+def file_trans(filename) :
     # 地域ID，固定值。
     REGION_ID = "cn-beijing"
     PRODUCT = "nls-filetrans"
@@ -67,7 +67,7 @@ def fileTrans(object_name) :
 
     # 生成下载文件的签名URL，有效时间为3600秒。
     # 设置slash_safe为True，OSS不会对Object完整路径中的正斜线（/）进行转义，此时生成的签名URL可以直接使用。
-    fileUrl = bucket.sign_url('GET', object_name, 3600, slash_safe=True)
+    fileUrl = bucket.sign_url('GET', 'sttFile/'+filename, 3600, slash_safe=True)
 
     # fileUrl = "https://stt-bucket.oss-cn-beijing.aliyuncs.com/helloworld/nls-sample-16k.wav?Expires=1733845668&OSSAccessKeyId=TMP.3KfozSkfUsJXDLc784yEQ3sqTuo14kv2YmjAD6veRVmNuajA7deYLW9rvjsMdj461JnW4Rz3U1Ygvmm6iXCGy295AxMqqA&Signature=I67YF2f1NLo13RP3Or91M3b2Sm4%3D"
     # fileUrl = "https://stt-bucket.oss-cn-beijing-internal.aliyuncs.com/helloworld/nls-sample-16k.wav"
@@ -128,15 +128,17 @@ def fileTrans(object_name) :
         print ("录音文件识别成功！")
         contentText = getResponse[KEY_RESULT][KEY_SENTENCES][0][KEY_TEXT]
         print (contentText)
-        return jsonify({'message': 'Success', 'payload': contentText, 'code': 'S'})
+        delete_file(filename)
+        return {'message': 'Success', 'payload': contentText, 'code': 'S'}
     else :
         print ("录音文件识别失败！")
-        return jsonify({'message': 'Error', 'payload': contentText, 'code': 'E'})
-    return
+        contentText = '录音文件识别失败！'
+        delete_file(filename)
+        return {'message': 'Error', 'payload': contentText, 'code': 'E'}
 
 # 填写Object完整路径，例如exampledir/exampleobject.txt。Object完整路径中不能包含Bucket名称。
-object_name = 'helloworld/nls-sample-16k.wav'
+filename = 'helloworld/nls-sample-16k.wav'
 
 
 # 执行录音文件识别
-# fileTrans(object_name)
+# file_trans(object_name)

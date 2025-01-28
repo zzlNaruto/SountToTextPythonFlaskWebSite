@@ -5,7 +5,7 @@ from oss2.credentials import EnvironmentVariableCredentialsProvider
 import os,sys
 import time
 import threading
-from sttLogic import fileTrans
+from sttLogic import file_trans
 
 
 # 从环境变量中获取访问凭证。运行本代码示例之前，请确保已设置环境变量OSS_ACCESS_KEY_ID和OSS_ACCESS_KEY_SECRET。
@@ -32,8 +32,8 @@ lock = threading.Lock()
 def home():
     return render_template('index.html')
 
-@app.route('/uploadFile', methods=['POST'])
-def uploadFile():
+@app.route('/upload-file', methods=['POST'])
+def upload_file():
     if 'audio_file' not in request.files:
         return "No file part", 400
     file = request.files['audio_file']
@@ -45,8 +45,8 @@ def uploadFile():
     action = request.form.get('action')
     print('action:', action)
 
-    if action == 'bottonSoundToText':
-        print('bottonSoundToText')
+    if action == 'botton_sound_to_text':
+        print('botton_sound_to_text')
         # 每个文件都拥有独立的进度信息
         with lock:
             uploadProgress[filename] = {'percentage': 0}
@@ -71,14 +71,14 @@ def uploadFile():
         # 启动后台线程进行文件上传
         threading.Thread(target=saveFileWithProgress, daemon=True).start()
         # 音频转文字在这里调用有问题，需要在网页端接收到上传完成后的状态再调用
-        return jsonify({'message': 'File uploaded successfully', 'action': 'bottonSoundToText', 'code': 'S', 'filename': filename}), 200
-    elif action == 'bottonRegenerate':
+        return jsonify({'message': 'File uploaded successfully', 'action': 'botton_sound_to_text', 'code': 'S', 'filename': filename}), 200
+    elif action == 'botton_regenerate':
         # 在这里添加语音转文字的逻辑
-        print('bottonRegenerate')
-        returnJson = fileTrans(filename)
-        convertedText = returnJson.payload
-        print(convertedText)
-        return returnJson, 200
+        print('botton_regenerate')
+        return_json = file_trans(filename)
+        converted_text = return_json.payload
+        print(converted_text)
+        return return_json, 200
     else:
         print('Invalid')
         return "Invalid action", 400
@@ -99,26 +99,31 @@ def progress():
 
     return Response(generate(), content_type='text/event-stream')
 
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
-
-@app.route('/soundToText', methods=['POST'])
-def soundToText():
+@app.route('/sound-to-text', methods=['POST'])
+def sound_to_text():
     data = request.json
     print(data)
     if not data:
         return jsonify({'error': 'Invalid JSON data'}), 400
 
     # 提取具体的键值
-    filename = data.get('filename')
-
+    filename = data['filename']
+    if not filename:
+        return jsonify({'error': 'Invalid JSON data'}), 400
+    
     # 返回处理后的响应
-    # returnText = fileTrans(filename)
-    returnText = jsonify({
-                            'message': 'Success', 'payload': 'contentText', 'code': 'S'
-                        })
-    if returnText.code == 'S':
-        # print(returnText)
-        return returnText, 200
-    elif returnText.code == 'E':
-        return returnText, 400
+    return_json = file_trans(filename)
+    print(return_json)
+    message = return_json.get('message')  # 获取 "message" 字段
+    payload = return_json.get('payload')  # 获取 "payload" 字段
+    code = return_json.get('code')  # 获取 "code" 字段
+    if return_json['code'] == 'S':  # 确保返回成功
+        # 根据获取的内容返回适当的响应
+        return jsonify({'message': message, 'payload': payload, 'code': code}), 200
+
+    else:
+        return jsonify({'message': message, 'payload': payload, 'code': code}), 400
+    
+    
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000, debug=True)

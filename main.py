@@ -28,10 +28,42 @@ uploadProgress = {}
 # 启动一个线程锁，确保线程安全
 lock = threading.Lock()
 
+MAX_FILE_SIZE = {
+    "Audio": 500 * 1024 * 1024,  # 500MB
+    "Video": 2000 * 1024 * 1024  # 2000MB
+}
+
 @app.route('/')
 def home():
     return render_template('index.html')
 
+@app.route('/check-filesize', methods=['POST'])
+def check_filesize():
+    if 'audio_file' not in request.files:
+        return "No file part", 400
+    file = request.files['audio_file']
+    if file.filename == '':
+        return "No selected file", 400
+    filename = secure_filename(file.filename)
+    print(filename)
+
+    file_type = "Audio" if file.mimetype.startswith("audio") else "Video"
+
+    print(file_type)
+
+    # 获取文件大小
+    file.seek(0, 2)  # 移动到文件末尾
+    file_size = file.tell()  # 获取文件大小（字节）
+    file.seek(0)  # 重新回到文件开头，防止影响后续处理
+
+    # 检查文件大小是否超过限制
+    if file_size > MAX_FILE_SIZE[file_type]:
+        payload = f"{file_type} File size is too large. {file_type} file maximum support {MAX_FILE_SIZE[file_type] / (1024 * 1024)}MB"
+        print(payload)
+        return jsonify({'message': 'File size is too large', 'payload': payload, 'code': 'E'}), 400
+    else:
+        return jsonify({'message': '', 'payload': payload, 'code': 'S'}), 200
+    
 @app.route('/upload-file', methods=['POST'])
 def upload_file():
     if 'audio_file' not in request.files:
@@ -40,6 +72,8 @@ def upload_file():
     if file.filename == '':
         return "No selected file", 400
     filename = secure_filename(file.filename)
+    print(filename)
+                                                          
     # 根据按钮的 value 执行不同操作
     print(request.form)  # 打印接收到的表单数据
     action = request.form.get('action')

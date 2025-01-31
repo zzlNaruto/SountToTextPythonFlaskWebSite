@@ -105,7 +105,7 @@ def upload_file():
         # 启动后台线程进行文件上传
         threading.Thread(target=saveFileWithProgress, daemon=True).start()
         # 音频转文字在这里调用有问题，需要在网页端接收到上传完成后的状态再调用
-        return jsonify({'message': 'File uploaded successfully', 'action': 'botton_sound_to_text', 'code': 'S', 'filename': filename}), 200
+        return jsonify({'message': '文件上传成功', 'action': 'botton_sound_to_text', 'code': 'S', 'filename': filename}), 200
     elif action == 'botton_regenerate':
         # 在这里添加语音转文字的逻辑
         print('botton_regenerate')

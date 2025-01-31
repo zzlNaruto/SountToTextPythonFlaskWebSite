@@ -132,7 +132,7 @@ def file_trans(filename) :
         return {'message': 'Success', 'payload': contentText, 'code': 'S'}
     else :
         print ("录音文件识别失败！")
-        contentText = 'Recording file recognition failure!'
+        contentText = '录音文件识别失败！'
         delete_file(filename)
         return {'message': 'Error', 'payload': contentText, 'code': 'E'}
 

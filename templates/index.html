@@ -53,7 +53,7 @@
 
         .progress-text {
             margin-top: 5px;
-            font-weight: bold;
+            font-weight: normal;
         }
         .logo {
             font-size: 4rem;
@@ -146,12 +146,12 @@
     <div class="container">
         <div class="logo">
             <span class="logo_red">S</span>
-            <span class="logo_yellowd">t</span>
-            <span class="logo_blue">a</span>
-            <span class="logo_green">n</span>
-            <span class="logo_red">d</span>
-            <span class="logo_yellowd">A</span>
-            <span class="logo_blue">I</span>
+            <span class="logo_blue">t</span>
+            <span class="logo_green">a</span>
+            <span class="logo_red">n</span>
+            <span class="logo_blue">d</span>
+            <span class="logo_green">A</span>
+            <span class="logo_red">I</span>
         </div>
         <form id="upload_form" action="/upload-file" method="POST" enctype="multipart/form-data">
             <div class="mb-3">
@@ -163,7 +163,7 @@
                     <div class="progress-bar" id="progress_bar"></div>
                 </div>
                 <div class="progress-text" id="progress_text"></div>
-                <div class="progress-text" id="progress_status" style="display: none;">正在生成...</div>
+                <div class="progress-text" id="progress_status" style="display: none;">正在生成文字，时间可能较久，请耐心等待...</div>
             </div>
             <div class="button-group" style="position: relative; top: 5px;">
                 <button type="submit" name="action" value="botton_sound_to_text" class="btn btn-primary">生成文字</button>
@@ -173,7 +173,7 @@
         <div id="result_container" class="result-container" style="display: none;">
             <!-- <h3>Result</h3> -->
             <p id="result_text" class="result-text"></p>
-            <button class="btn btn-primary" onclick="copyText()">复制</button>
+            <button class="btn btn-primary" id = "btn_copy" onclick="copyText()">复制</button>
         </div>
         
     </div>
@@ -248,20 +248,7 @@
             progressText.textContent = '';
             progressStatus.style.display = 'none';
             resultContainer.style.display = 'none';
-            // Upload complete callback
-            // Use XHR 
-            // const xhr = new XMLHttpRequest();
-            // xhr.open('POST', '/uploadFile', true);
-            // xhr.onload = function() {
-            //     if (xhr.status === 200) {
-            //         console.log('Upload successful');
-            //         // You can display a success message here or trigger other actions
-            //     } else {
-            //         console.log('Upload failed');
-            //     }
-            // };
-            // // Send the form data (with file)
-            // xhr.send(formData);
+
 
             // Use Fetch
             fetch('/upload-file', {
@@ -281,51 +268,67 @@
                 const action = data.action;
                 const message = data.message;
                 const filename = data.filename;
-                if (code == 'S') {
-                    setTimeout(function() {
-                        progressText.style.display = 'none';
-                        progressBarContainer.style.display = 'none'
-                        progressStatus.style.display = 'block';
-                        progressStatus.textContent = '正在生成...';
-                    }, 2500);
-                    fetch('/sound-to-text', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({ 
-                            filename: filename 
-                        }) // 如果需要传参
-                    })
-                    .then(response => {
-                        progressText.style.display = 'none';
-                        progressBarContainer.style.display = 'none'
-                        resultContainer.style.display = 'none';
-                        if (!response.ok) {
-                            // throw new Error(`HTTP error! Status: ${response.status}`);
-                        }
-                        return response.json(); // 将返回值解析为 JSON
-                    })
-                    .then(data => {
-                        console.log('Response from /soundToText:', data);
-                        // 访问后端返回的字段
-                        const code = data.code;
-                        const message = data.message;
-                        const payload = data.payload;
-                        if(code == 'S')
-                        {
-                            showResult(payload)   
-                        }
-                        else if(code =='E')
-                        {
-                            progressContainer.style.display = 'none'
-                            fileOversize.innerText = payload
-                        }
-                    })
-                    .catch(error => {
-                        console.error('Error:', error);
-                    });
-                }
+                
+                let interval = setInterval(() => {
+                    fetch(`/upload-progress?filename=${filename}`)
+                        .then(res => res.json())
+                        .then(data => {
+                            console.log('filename from updateProgress:', filename);
+                            console.log('progress percentage from /upload-progress:', data);
+                            progressBar.style.width = data.percentage + '%';
+                            progressText.textContent = '上传进度: '+data.percentage + '%';
+                            if (data.percentage >= 100) 
+                            {
+                                clearInterval(interval);
+                                console.log('上传完成，开始调用 sound-to-text 接口...');
+                                if (code == 'S') {
+                                    setTimeout(function() {
+                                        progressText.style.display = 'none';
+                                        progressBarContainer.style.display = 'none'
+                                        progressStatus.style.display = 'block';
+                                        progressStatus.textContent = '正在生成文字，时间可能较久，请耐心等待...';
+                                    }, 2500);
+                                    fetch('/sound-to-text', {
+                                        method: 'POST',
+                                        headers: {
+                                            'Content-Type': 'application/json'
+                                        },
+                                        body: JSON.stringify({ 
+                                            filename: filename 
+                                        }) // 如果需要传参
+                                    })
+                                    .then(response => {
+                                        progressText.style.display = 'none';
+                                        progressBarContainer.style.display = 'none'
+                                        resultContainer.style.display = 'none';
+                                        if (!response.ok) {
+                                            // throw new Error(`HTTP error! Status: ${response.status}`);
+                                        }
+                                        return response.json(); // 将返回值解析为 JSON
+                                    })
+                                    .then(data => {
+                                        console.log('Response from /soundToText:', data);
+                                        // 访问后端返回的字段
+                                        const code = data.code;
+                                        const message = data.message;
+                                        const payload = data.payload;
+                                        if(code == 'S')
+                                        {
+                                            showResult(payload)   
+                                        }
+                                        else if(code =='E')
+                                        {
+                                            progressContainer.style.display = 'none'
+                                            fileOversize.innerText = payload
+                                        }
+                                    })
+                                    .catch(error => {
+                                        console.error('Error:', error);
+                                    });
+                                }
+                            }
+                        });
+                }, 1000); // 每 500ms 轮询一次
             })
             .catch(error => {
                 console.error('Error:', error);
@@ -333,12 +336,12 @@
         });
 
         // SSE: Update progress bar with server-side progress
-        const progressSource = new EventSource('/progress');
-        progressSource.onmessage = function(event) {
-            const progress = JSON.parse(event.data);
-            progressBar.style.width = progress.percentage + '%';
-            progressText.textContent = '上传进度: '+progress.percentage + '%';
-        };
+        // const progressSource = new EventSource('/progress');
+        // progressSource.onmessage = function(event) {
+        //     const progress = JSON.parse(event.data);
+        //     progressBar.style.width = progress.percentage + '%';
+        //     progressText.textContent = '上传进度: '+progress.percentage + '%';
+        // };
 
         // Function to handle the response from the server
         function showResult(content) {
@@ -351,14 +354,22 @@
             // Update the result text
             resultText.textContent = content;
             progressStatus.textContent = '完成';
+            progressStatus.style.display = 'none';
         }
 
         // Function to copy result text to clipboard
         function copyText() {
             const resultText = document.getElementById('result_text').textContent;
             navigator.clipboard.writeText(resultText).then(() => {
-                // alert('已复制');
+                showToast();
             });
+        }
+        function showToast() {
+            const btnCopy = document.getElementById('btn_copy');
+            btnCopy.textContent = '已复制';
+            setTimeout(() => {
+                btnCopy.textContent = '复制';
+            }, 3000);
         }
 
     </script>

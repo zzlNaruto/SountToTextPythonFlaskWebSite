@@ -18,7 +18,7 @@ endpoint = "https://oss-cn-beijing.aliyuncs.com"
 region = "cn-beijing"
 
 # yourBucketName填写存储空间名称。
-bucket = oss2.Bucket(auth, endpoint, "stt-bucket", region=region)
+bucket = oss2.Bucket(auth, endpoint, "standai-stt-bucket", region=region)
 
 app = Flask(__name__)
 
@@ -72,12 +72,12 @@ def upload_file():
     if file.filename == '':
         return "No selected file", 400
     filename = secure_filename(file.filename)
-    print(filename)
+    print('filename from /upload-file:',filename)
                                                           
     # 根据按钮的 value 执行不同操作
     print(request.form)  # 打印接收到的表单数据
     action = request.form.get('action')
-    print('action:', action)
+    print('action from /upload-file:', action)
 
     if action == 'botton_sound_to_text':
         print('botton_sound_to_text')
@@ -111,7 +111,7 @@ def upload_file():
         print('botton_regenerate')
         return_json = file_trans(filename)
         converted_text = return_json.payload
-        print(converted_text)
+        print('converted_text from /upload-file:', converted_text)
         return return_json, 200
     else:
         print('Invalid')
@@ -132,6 +132,15 @@ def progress():
             time.sleep(0.5)  # 每秒钟推送一次进度
 
     return Response(generate(), content_type='text/event-stream')
+
+@app.route('/upload-progress', methods=['GET'])
+def upload_progress():
+    filename = request.args.get('filename')
+    print('filename from /upload-progress:',filename)  # 打印接收到的表单数据
+    with lock:
+        progress = uploadProgress.get(filename)
+        print(progress)  # 打印接收到的表单数据
+    return jsonify(progress)
 
 @app.route('/sound-to-text', methods=['POST'])
 def sound_to_text():

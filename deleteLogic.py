@@ -13,7 +13,7 @@ def delete_file(filename) :
     region = "cn-beijing"
 
     # yourBucketName填写存储空间名称。
-    bucket_name = "stt-bucket"
+    bucket_name = "standai-stt-bucket"
     # examplebucket填写存储空间名称。
     bucket = oss2.Bucket(auth, endpoint, bucket_name, region=region)
 

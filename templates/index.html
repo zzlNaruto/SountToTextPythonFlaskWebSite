@@ -189,6 +189,7 @@
     </div>
     
     <script src="../static/js/bootstrap.bundle.min.js"></script>
+    <script src="../static/js/socket.io.min.js"></script>
     <script>
         const audioFile = document.getElementById('audio_file');
         const fileOversize = document.getElementById('file_oversize');
@@ -203,6 +204,8 @@
 
         const resultContainer = document.getElementById('result_container');
         const resultText = document.getElementById('result_text');
+
+        let socket;
 
         audioFile.addEventListener("change", function(event) {
             const file = event.target.files[0];
@@ -225,11 +228,13 @@
         });
 
         // Show progress container when upload starts
-        uploadForm.addEventListener('submit', function(event) {
+        uploadForm.addEventListener('submit', async function(event) {
             event.preventDefault();  // Prevent form from submitting normally
 
             const formData = new FormData(upload_form);
-
+            const file = audioFile.files[0];
+            const filename = file.name;
+            console.log('File name:', filename);
             // 获取触发提交的按钮
             const actionButton = document.activeElement; // 当前激活的按钮
             if (actionButton && actionButton.name === 'action') {
@@ -249,90 +254,8 @@
             progressStatus.style.display = 'none';
             resultContainer.style.display = 'none';
 
-
-            // Use Fetch
-            fetch('/upload-file', {
-                method: 'POST',
-                body: formData
-            })
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error(`HTTP error! Status: ${response.status}`);
-                }
-                return response.json(); // 将返回值解析为 JSON
-            })
-            .then(data => {
-                console.log('Response from /uploadFile:', data);
-                // 访问后端返回的字段
-                const code = data.code;
-                const action = data.action;
-                const message = data.message;
-                const filename = data.filename;
-                
-                let interval = setInterval(() => {
-                    fetch(`/upload-progress?filename=${filename}`)
-                        .then(res => res.json())
-                        .then(data => {
-                            console.log('filename from updateProgress:', filename);
-                            console.log('progress percentage from /upload-progress:', data);
-                            progressBar.style.width = data.percentage + '%';
-                            progressText.textContent = '上传进度: '+data.percentage + '%';
-                            if (data.percentage >= 100) 
-                            {
-                                clearInterval(interval);
-                                console.log('上传完成，开始调用 sound-to-text 接口...');
-                                if (code == 'S') {
-                                    setTimeout(function() {
-                                        progressText.style.display = 'none';
-                                        progressBarContainer.style.display = 'none'
-                                        progressStatus.style.display = 'block';
-                                        progressStatus.textContent = '正在生成文字，时间可能较久，请耐心等待...';
-                                    }, 2500);
-                                    fetch('/sound-to-text', {
-                                        method: 'POST',
-                                        headers: {
-                                            'Content-Type': 'application/json'
-                                        },
-                                        body: JSON.stringify({ 
-                                            filename: filename 
-                                        }) // 如果需要传参
-                                    })
-                                    .then(response => {
-                                        progressText.style.display = 'none';
-                                        progressBarContainer.style.display = 'none'
-                                        resultContainer.style.display = 'none';
-                                        if (!response.ok) {
-                                            // throw new Error(`HTTP error! Status: ${response.status}`);
-                                        }
-                                        return response.json(); // 将返回值解析为 JSON
-                                    })
-                                    .then(data => {
-                                        console.log('Response from /soundToText:', data);
-                                        // 访问后端返回的字段
-                                        const code = data.code;
-                                        const message = data.message;
-                                        const payload = data.payload;
-                                        if(code == 'S')
-                                        {
-                                            showResult(payload)   
-                                        }
-                                        else if(code =='E')
-                                        {
-                                            progressContainer.style.display = 'none'
-                                            fileOversize.innerText = payload
-                                        }
-                                    })
-                                    .catch(error => {
-                                        console.error('Error:', error);
-                                    });
-                                }
-                            }
-                        });
-                }, 1000); // 每 500ms 轮询一次
-            })
-            .catch(error => {
-                console.error('Error:', error);
-            });
+            startWebSocket();
+            await handleUpload(formData);
         });
 
         // SSE: Update progress bar with server-side progress
@@ -344,10 +267,7 @@
         // };
 
         // Function to handle the response from the server
-        function showResult(content) {
-            const resultContainer = document.getElementById('result_container');
-            const resultText = document.getElementById('result_text');
-            
+        function showResult(content) {            
             // Display the result container
             resultContainer.style.display = 'block';
             
@@ -359,7 +279,7 @@
 
         // Function to copy result text to clipboard
         function copyText() {
-            const resultText = document.getElementById('result_text').textContent;
+            const resultTextContent = resultText.textContent;
             navigator.clipboard.writeText(resultText).then(() => {
                 showToast();
             });
@@ -371,7 +291,133 @@
                 btnCopy.textContent = '复制';
             }, 3000);
         }
+        async function uploadFile(formData) {
+            try {
+                // Use Fetch
+                const response = await fetch('/upload-file', {
+                    method: 'POST',
+                    body: formData
+                })
+                const data = await response.json();
+                // 访问后端返回的字段
+                const code = data.code;
+                const action = data.action;
+                const message = data.message;
+                filename = data.filename;
+                
+                if (code == 'S') {
+                    console.log('文件上传成功开始生成文字');
+                    setTimeout(() => {
+                        progressText.style.display = 'none';
+                        progressBarContainer.style.display = 'none'
+                        progressStatus.style.display = 'block';
+                        progressStatus.textContent = '正在生成文字，时间可能较久，请耐心等待...';
+                    }, 2000); // 等待2秒
+                    return filename;
+                }
+                else
+                {
+                    progressContainer.style.display = 'none'
+                    fileOversize.innerText = "录音文件上传失败！";
+                }
+            } catch (error) {
+                progressContainer.style.display = 'none'
+                fileOversize.innerText = "录音文件上传失败！";
+                console.error('uploadFile:', error);
+            }
+        }
+        async function soundToText(filename) {
+            try {
+                progressText.style.display = 'none';
+                progressBarContainer.style.display = 'none'
+                resultContainer.style.display = 'none';
+                const response = await fetch('/sound-to-text', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ 
+                        filename: filename 
+                    }) // 如果需要传参
+                })
+                const data = await response.json();
+                console.log('Response from /soundToText:', data);
+                // 访问后端返回的字段
+                const code = data.code;
+                const message = data.message;
+                const payload = data.payload;
+                if(code == 'S')
+                {
+                    showResult(payload)   
+                }
+                else if(code =='E')
+                {
+                    progressContainer.style.display = 'none'
+                    fileOversize.innerText = payload
+                }
+            } catch (error) {
+                progressContainer.style.display = 'none'
+                fileOversize.innerText = "录音文件识别失败！";
+                console.error('soundToText:', error);
+            }
+        }
+        // 主逻辑，确保上传文件成功后再调用处理函数
+        async function handleUpload(formData) {
+            try {
+                const filename = await uploadFile(formData);  // 等待文件上传完成
+                if(filename)
+                {
+                    
+                }
+                // await soundToText(filename);  // 文件上传完成后，调用处理函数
+            } catch (error) {
+                console.error('Error during the upload or processing:', error);
+            }
+        }
+        // 启动 WebSocket
+        function startWebSocket() {
+            // 使用 socket.io 客户端连接 WebSocket
+            // socket = io('http://127.0.0.1:5000');  // 请根据实际地址修改
+            socket = io(window.location.origin);
 
+            socket.on('connect', function () {
+                console.log("WebSocket connection established");
+            });
+
+            socket.on('upload-progress', function (data) {
+                let wsFilename = data.filename;
+                let wsPercentage = data.percentage;
+                if(wsFilename !== null || wsPercentage !== null)
+                {
+                    console.log(`websocket data file: ${wsFilename}, percentage: ${wsPercentage}%`);
+                    if(data.percentage >-1)
+                    {
+                        progressBar.style.width = wsPercentage + '%';
+                        progressText.textContent = '上传进度: ' + wsPercentage + '%';
+                    }
+                    if (wsPercentage >= 100) {
+                        progressBar.style.width = 100 + '%';
+                        progressText.textContent = '上传进度: ' + 100 + '%';
+                        closeWebSocket();
+                        console.log('上传完成, 关闭WebSocket...');
+                    }
+                }
+            });
+
+            socket.on('disconnect', function () {
+                console.log("WebSocket connection closed");
+            });
+        }
+
+        // 停止 WebSocket
+        function closeWebSocket() {
+            if (socket) {
+                socket.disconnect();
+                console.log("WebSocket connection manually closed");
+            }
+        }
+        // 页面卸载时关闭 WebSocket 连接
+        window.onbeforeunload = closeWebSocket;
     </script>
 </body>
 </html>

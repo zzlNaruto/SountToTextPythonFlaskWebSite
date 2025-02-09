@@ -6,6 +6,7 @@ import os,sys
 import time
 import threading
 from sttLogic import file_trans
+from flask_socketio import SocketIO, emit
 
 
 # 从环境变量中获取访问凭证。运行本代码示例之前，请确保已设置环境变量OSS_ACCESS_KEY_ID和OSS_ACCESS_KEY_SECRET。
@@ -21,12 +22,13 @@ region = "cn-beijing"
 bucket = oss2.Bucket(auth, endpoint, "standai-stt-bucket", region=region)
 
 app = Flask(__name__)
+socketio = SocketIO(app, cors_allowed_origins="*")
 
-# 存储上传进度的字典，避免覆盖问题
-uploadProgress = {}
+# 存储上传进度的字典，避免覆盖问题，使用websocket传输进度就不需要了，而且用fetch上传文件时，无法通过轮询获取当前上传进度
+# uploadProgress = {}
 
 # 启动一个线程锁，确保线程安全
-lock = threading.Lock()
+# lock = threading.Lock()
 
 MAX_FILE_SIZE = {
     "Audio": 500 * 1024 * 1024,  # 500MB
@@ -45,7 +47,6 @@ def check_filesize():
     if file.filename == '':
         return "No selected file", 400
     filename = secure_filename(file.filename)
-    print(filename)
 
     file_type = "Audio" if file.mimetype.startswith("audio") else "Video"
 
@@ -72,7 +73,7 @@ def upload_file():
     if file.filename == '':
         return "No selected file", 400
     filename = secure_filename(file.filename)
-    print('filename from /upload-file:',filename)
+    print('filename from /upload-file secure_filename:',filename)
                                                           
     # 根据按钮的 value 执行不同操作
     print(request.form)  # 打印接收到的表单数据
@@ -82,28 +83,37 @@ def upload_file():
     if action == 'botton_sound_to_text':
         print('botton_sound_to_text')
         # 每个文件都拥有独立的进度信息
-        with lock:
-            uploadProgress[filename] = {'percentage': 0}
+        # with lock:
+        # uploadProgress[filename] = {'percentage': 0}
 
-        def saveFileWithProgress():
-            # consumed_bytes表示已上传的数据量。
-            # total_bytes表示待上传的总数据量。当无法确定待上传的数据长度时，total_bytes的值为None。
-            def percentage(consumed_bytes, total_bytes):
-                if total_bytes:
-                    rate = int(100 * (float(consumed_bytes) / float(total_bytes)))
-                    # 更新文件上传进度
-                    with lock:
-                        uploadProgress[filename]['percentage'] = rate
-                    sys.stdout.flush()
-            # 使用文件对象上传到 OSS
-            fileData = file.read()
-            bucket.put_object('sttFile/'+filename, fileData,progress_callback=percentage)
-            # 上传完成后，设置上传进度为100
-            with lock:
-                uploadProgress[filename]['percentage'] = 100
+        # def saveFileWithProgress():
+        # consumed_bytes表示已上传的数据量。
+        # total_bytes表示待上传的总数据量。当无法确定待上传的数据长度时，total_bytes的值为None。
+        last_emit_time = time.time()
+        def percentage(consumed_bytes, total_bytes):
+            nonlocal last_emit_time
+            if total_bytes:
+                rate = int(100 * (float(consumed_bytes) / float(total_bytes)))
+                # 更新文件上传进度
+                # with lock:
+                # uploadProgress[filename]['percentage'] = rate
+                current_time = time.time()
+                # 2秒更新一次进度
+                if current_time - last_emit_time > 2.0:
+                    print('uploadProgress from /upload-file/percentage:',rate)  # 每隔2S打印接收到的表单数据
+                    socketio.emit('upload-progress', {'filename': filename, 'percentage': rate})  # 直接推送进度
+                    socketio.sleep(0)
+                    last_emit_time = current_time  # 更新上次发送
+        # 使用文件对象上传到 OSS
+        fileData = file.read()
+        bucket.put_object('sttFile/'+filename, fileData,progress_callback=percentage)
+        # 上传完成后，设置上传进度为100
+        # with lock:
+        # uploadProgress[filename]['percentage'] = 100
+        socketio.emit('upload-progress', {'file': filename, 'percentage': 100})  # 直接推送进度
 
         # 启动后台线程进行文件上传
-        threading.Thread(target=saveFileWithProgress, daemon=True).start()
+        # threading.Thread(target=saveFileWithProgress, daemon=True).start()
         # 音频转文字在这里调用有问题，需要在网页端接收到上传完成后的状态再调用
         return jsonify({'message': '文件上传成功', 'action': 'botton_sound_to_text', 'code': 'S', 'filename': filename}), 200
     elif action == 'botton_regenerate':
@@ -117,30 +127,32 @@ def upload_file():
         print('Invalid')
         return "Invalid action", 400
 
-@app.route('/progress')
-def progress():
+# @app.route('/progress')
+# def progress():
     """
     通过 SSE 向前端推送上传进度
     """
-    def generate():
-        while True:
-            with lock:
-                # 只推送每个文件的上传进度
-                for filename, progress_data in uploadProgress.items():
-                    print('\r{0}% '.format(progress_data['percentage']), end='')
-                    yield f"data: {{\"file\": \"{filename}\", \"percentage\": {progress_data['percentage']}}}\n\n"
-            time.sleep(0.5)  # 每秒钟推送一次进度
+    # def generate():
+        # while True:
+            # with lock:
+            #     # 只推送每个文件的上传进度
+            #     for filename, progress_data in uploadProgress.items():
+            #         print('\r{0}% '.format(progress_data['percentage']), end='')
+            #         yield f"data: {{\"file\": \"{filename}\", \"percentage\": {progress_data['percentage']}}}\n\n"
+            # time.sleep(0.5)  # 每秒钟推送一次进度
 
-    return Response(generate(), content_type='text/event-stream')
+    # return Response(generate(), content_type='text/event-stream')
 
-@app.route('/upload-progress', methods=['GET'])
-def upload_progress():
-    filename = request.args.get('filename')
-    print('filename from /upload-progress:',filename)  # 打印接收到的表单数据
-    with lock:
-        progress = uploadProgress.get(filename)
-        print(progress)  # 打印接收到的表单数据
-    return jsonify(progress)
+# @app.route('/upload-progress', methods=['GET'])
+# def upload_progress():
+    # with lock:
+    # filename = request.args.get('filename')
+    # print('filename from /upload-progress:',filename)  # 打印接收到的表单数据
+    # print('uploadProgress from /upload-progress:',uploadProgress)  # 打印接收到的表单数据
+    # progress = uploadProgress.get(filename)
+    # if not progress:
+    #     progress = {'percentage': -1}
+    # return jsonify(progress)
 
 @app.route('/sound-to-text', methods=['POST'])
 def sound_to_text():
@@ -167,6 +179,14 @@ def sound_to_text():
     else:
         return jsonify({'message': message, 'payload': payload, 'code': code}), 400
     
-    
+@socketio.on('connect')
+def handle_connect():
+    print("客户端已连接")
+
+@socketio.on('disconnect')
+def handle_disconnect():
+    print("客户端已断开连接")
+
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=False)
+    socketio.run(app, host='0.0.0.0', port=5000, debug=False)
+

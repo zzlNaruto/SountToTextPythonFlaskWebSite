@@ -3,4 +3,6 @@ werkzeug==2.1.0
 gunicorn==20.1.0
 oss2
 requests
-# 其他依赖
+flask_socketio
+gevent==21.12.0  # 为了支持 WebSocket
+gevent-websocket==0.10.1  # 为了支持 WebSocket

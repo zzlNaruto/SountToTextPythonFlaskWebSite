@@ -53,7 +53,8 @@ def file_trans(filename) :
     # 从环境变量中获取访问凭证。运行本代码示例之前，请确保已设置环境变量OSS_ACCESS_KEY_ID和OSS_ACCESS_KEY_SECRET。
     auth = oss2.ProviderAuth(EnvironmentVariableCredentialsProvider())
     # 填写Bucket所在地域对应的Endpoint。以华东1（杭州）为例，Endpoint填写为https://oss-cn-hangzhou.aliyuncs.com。
-    endpoint = "https://oss-cn-beijing.aliyuncs.com"
+    endpoint = "https://oss-cn-beijing-internal.aliyuncs.com"
+    # endpoint = "https://oss-cn-beijing.aliyuncs.com"
 
     # 填写Endpoint对应的Region信息，例如cn-hangzhou。注意，v4签名下，必须填写该参数
     region = "cn-beijing"

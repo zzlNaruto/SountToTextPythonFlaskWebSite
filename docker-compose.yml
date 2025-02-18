@@ -14,19 +14,46 @@ services:
     environment:
       - FLASK_APP=main.py  # 设置 Flask 应用入口
       - FLASK_ENV=production  # 设置 Flask 环境为生产环境
+      - VIRTUAL_HOST=standai.tech,www.standai.tech  # 配置 Nginx 代理的域名
+      - VIRTUAL_PORT=5000  # 配置 Flask 应用的端口
+      - LETSENCRYPT_HOST=standai.tech,www.standai.tech
+      - LETSENCRYPT_EMAIL=120311662@qq.com
     restart: always
     networks:
       - app_network
 
-  nginx:
-    image: nginx:latest
-    container_name: nginx_proxy
+  nginx-proxy:
+    image: jwilder/nginx-proxy
+    container_name: nginx-proxy
+    environment:
+      - DEFAULT_HOST=standai.tech  # 默认的主机名
     ports:
       - "80:80"
+      - "443:443"
     volumes:
-      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - /var/run/docker.sock:/tmp/docker.sock:ro  # 允许 nginx-proxy 容器访问 Docker 容器的 API
+      - ./certs:/etc/nginx/certs
+      - ./vhost.d:/etc/nginx/vhost.d
+      - ./html:/usr/share/nginx/html
     depends_on:
       - standai_stt_app
+    networks:
+      - app_network
+  
+  # nginx-proxy-letsencrypt 容器
+  nginx-proxy-letsencrypt:
+    image: jrcs/letsencrypt-nginx-proxy-companion
+    container_name: nginx-proxy-letsencrypt
+    environment:
+      - NGINX_PROXY_CONTAINER=nginx-proxy  # 指定 nginx-proxy 容器
+      - DEFAULT_EMAIL=120311662@qq.com  # SSL 证书的邮箱
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro  # 允许该容器访问 Docker 容器的 API
+      - ./certs:/etc/nginx/certs
+      - ./vhost.d:/etc/nginx/vhost.d
+      - ./html:/usr/share/nginx/html
+    depends_on:
+      - nginx-proxy
     networks:
       - app_network
 

@@ -13,7 +13,8 @@ from flask_socketio import SocketIO, emit
 auth = oss2.ProviderAuthV4(EnvironmentVariableCredentialsProvider())
 
 # 填写Bucket所在地域对应的Endpoint。以华东1（杭州）为例，Endpoint填写为https://oss-cn-hangzhou.aliyuncs.com。
-endpoint = "https://oss-cn-beijing.aliyuncs.com"
+# endpoint = "https://oss-cn-beijing.aliyuncs.com"
+endpoint = "https://oss-cn-beijing-internal.aliyuncs.com"
 
 # 填写Endpoint对应的Region信息，例如cn-hangzhou。注意，v4签名下，必须填写该参数
 region = "cn-beijing"

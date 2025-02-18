@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <script type="text/javascript" src="https://js.users.51.la/21945253.js"></script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>在线音频转文字 - 快速精准的AI语音识别</title>
@@ -187,7 +188,6 @@
             </a>
         </p>
     </div>
-    
     <script src="../static/js/bootstrap.bundle.min.js"></script>
     <script src="../static/js/socket.io.min.js"></script>
     <script>
@@ -253,6 +253,7 @@
             progressText.textContent = '';
             progressStatus.style.display = 'none';
             resultContainer.style.display = 'none';
+            fileOversize.innerText = "";
 
             startWebSocket();
             await handleUpload(formData);
@@ -280,7 +281,7 @@
         // Function to copy result text to clipboard
         function copyText() {
             const resultTextContent = resultText.textContent;
-            navigator.clipboard.writeText(resultText).then(() => {
+            navigator.clipboard.writeText(resultTextContent).then(() => {
                 showToast();
             });
         }
@@ -290,6 +291,9 @@
             setTimeout(() => {
                 btnCopy.textContent = '复制';
             }, 3000);
+        }
+        function delay(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
         }
         async function uploadFile(formData) {
             try {
@@ -306,13 +310,10 @@
                 filename = data.filename;
                 
                 if (code == 'S') {
-                    console.log('文件上传成功开始生成文字');
-                    setTimeout(() => {
-                        progressText.style.display = 'none';
-                        progressBarContainer.style.display = 'none'
-                        progressStatus.style.display = 'block';
-                        progressStatus.textContent = '正在生成文字，时间可能较久，请耐心等待...';
-                    }, 2000); // 等待2秒
+                    console.log('文件上传成功');
+                    progressBar.style.width = 100 + '%';
+                    progressText.textContent = '上传进度: ' + 100 + '%';
+                    await delay(2000); // 等待2秒
                     return filename;
                 }
                 else
@@ -328,8 +329,11 @@
         }
         async function soundToText(filename) {
             try {
+                console.log('开始生成文字');
                 progressText.style.display = 'none';
                 progressBarContainer.style.display = 'none'
+                progressStatus.style.display = 'block';
+                progressStatus.textContent = '正在生成文字，时间可能较久，请耐心等待...';
                 resultContainer.style.display = 'none';
                 const response = await fetch('/sound-to-text', {
                     method: 'POST',
@@ -367,10 +371,11 @@
                 const filename = await uploadFile(formData);  // 等待文件上传完成
                 if(filename)
                 {
-                    
+                    await soundToText(filename);  // 文件上传完成后，调用处理函数   
                 }
-                // await soundToText(filename);  // 文件上传完成后，调用处理函数
             } catch (error) {
+                progressContainer.style.display = 'none'
+                fileOversize.innerText = "录音文件上传失败！";
                 console.error('Error during the upload or processing:', error);
             }
         }
@@ -390,16 +395,16 @@
                 if(wsFilename !== null || wsPercentage !== null)
                 {
                     console.log(`websocket data file: ${wsFilename}, percentage: ${wsPercentage}%`);
-                    if(data.percentage >-1)
+                    if(wsPercentage >-1)
                     {
                         progressBar.style.width = wsPercentage + '%';
                         progressText.textContent = '上传进度: ' + wsPercentage + '%';
-                    }
-                    if (wsPercentage >= 100) {
-                        progressBar.style.width = 100 + '%';
-                        progressText.textContent = '上传进度: ' + 100 + '%';
-                        closeWebSocket();
-                        console.log('上传完成, 关闭WebSocket...');
+                        if (wsPercentage >= 100) {
+                            progressBar.style.width = 100 + '%';
+                            progressText.textContent = '上传进度: ' + 100 + '%';
+                            closeWebSocket();
+                            console.log('上传完成, 关闭WebSocket...');
+                        }
                     }
                 }
             });
